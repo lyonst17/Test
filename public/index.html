@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI LLM Hub</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>AI LLM Hub</h1>
+      <p class="subtitle">Chat with ChatGPT, Claude &amp; Gemini in one place</p>
+    </header>
+
+    <div class="layout">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-section">
+          <label for="provider-select">Provider</label>
+          <select id="provider-select">
+            <option value="openai">OpenAI (ChatGPT)</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="google">Google (Gemini)</option>
+          </select>
+        </div>
+
+        <div class="sidebar-section">
+          <label for="model-select">Model</label>
+          <select id="model-select"></select>
+        </div>
+
+        <div class="sidebar-section">
+          <label for="temperature-slider">
+            Temperature: <span id="temp-value">0.7</span>
+          </label>
+          <input
+            type="range"
+            id="temperature-slider"
+            min="0"
+            max="1"
+            step="0.1"
+            value="0.7"
+          />
+        </div>
+
+        <div class="sidebar-section">
+          <label for="max-tokens-input">Max Tokens</label>
+          <input
+            type="number"
+            id="max-tokens-input"
+            min="1"
+            max="16384"
+            value="2048"
+          />
+        </div>
+
+        <div class="sidebar-section">
+          <label for="system-prompt">System Prompt</label>
+          <textarea
+            id="system-prompt"
+            rows="4"
+            placeholder="Optional system instructions..."
+          ></textarea>
+        </div>
+
+        <button id="new-chat-btn" class="btn btn-secondary">New Chat</button>
+
+        <div class="sidebar-section status-section" id="status-section">
+          <h3>API Status</h3>
+          <div id="api-status">Checking...</div>
+        </div>
+      </aside>
+
+      <!-- Chat Area -->
+      <main class="chat-area">
+        <div class="messages" id="messages">
+          <div class="welcome-message">
+            <h2>Welcome to AI LLM Hub</h2>
+            <p>Select a provider and model from the sidebar, then start chatting.</p>
+            <div class="provider-cards">
+              <div class="provider-card" data-provider="openai">
+                <div class="provider-icon openai-icon">G</div>
+                <span>ChatGPT</span>
+              </div>
+              <div class="provider-card" data-provider="anthropic">
+                <div class="provider-icon anthropic-icon">C</div>
+                <span>Claude</span>
+              </div>
+              <div class="provider-card" data-provider="google">
+                <div class="provider-icon google-icon">G</div>
+                <span>Gemini</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="input-area">
+          <textarea
+            id="user-input"
+            placeholder="Type your message..."
+            rows="1"
+          ></textarea>
+          <button id="send-btn" class="btn btn-primary" disabled>Send</button>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
