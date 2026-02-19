@@ -11,11 +11,15 @@
   const userInput = document.getElementById('user-input');
   const sendBtn = document.getElementById('send-btn');
   const apiStatusEl = document.getElementById('api-status');
+  const attachBtn = document.getElementById('attach-btn');
+  const fileInput = document.getElementById('file-input');
+  const attachmentList = document.getElementById('attachment-list');
 
   // State
   let conversationHistory = [];
   let isGenerating = false;
   let modelData = {};
+  let pendingAttachments = [];
 
   // Provider display info
   const providerInfo = {
@@ -95,6 +99,10 @@
     sendBtn.addEventListener('click', sendMessage);
     newChatBtn.addEventListener('click', clearChat);
 
+    // Attachment handlers
+    attachBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', handleFileSelect);
+
     // Provider card click handlers
     document.querySelectorAll('.provider-card').forEach((card) => {
       card.addEventListener('click', () => {
@@ -106,11 +114,60 @@
     });
   }
 
+  // Attachment handling
+  function handleFileSelect(e) {
+    const files = Array.from(e.target.files);
+    files.forEach((file) => {
+      if (pendingAttachments.length >= 5) return; // Max 5 attachments
+      pendingAttachments.push(file);
+    });
+    fileInput.value = '';
+    renderAttachmentList();
+  }
+
+  function removeAttachment(index) {
+    pendingAttachments.splice(index, 1);
+    renderAttachmentList();
+  }
+
+  function renderAttachmentList() {
+    attachmentList.innerHTML = pendingAttachments
+      .map(
+        (file, i) => `
+        <div class="attachment-chip">
+          <span>${truncateFilename(file.name, 20)}</span>
+          <button class="remove-attachment" data-index="${i}">&times;</button>
+        </div>`
+      )
+      .join('');
+    attachmentList.querySelectorAll('.remove-attachment').forEach((btn) => {
+      btn.addEventListener('click', () => removeAttachment(parseInt(btn.dataset.index)));
+    });
+  }
+
+  function truncateFilename(name, maxLen) {
+    if (name.length <= maxLen) return name;
+    const ext = name.lastIndexOf('.') > 0 ? name.slice(name.lastIndexOf('.')) : '';
+    const base = name.slice(0, name.length - ext.length);
+    const truncLen = maxLen - ext.length - 3;
+    return truncLen > 0 ? base.slice(0, truncLen) + '...' + ext : name.slice(0, maxLen);
+  }
+
+  async function readFileAsBase64(file) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(file);
+    });
+  }
+
   function clearChat() {
     conversationHistory = [];
+    pendingAttachments = [];
+    renderAttachmentList();
     messagesContainer.innerHTML = `
       <div class="welcome-message">
-        <h2>Welcome to AI LLM Hub</h2>
+        <h2>Welcome to Marc Fisher Footwear AI Hub</h2>
         <p>Select a provider and model from the sidebar, then start chatting.</p>
         <div class="provider-cards">
           <div class="provider-card" data-provider="openai">
@@ -145,9 +202,17 @@
     const welcome = messagesContainer.querySelector('.welcome-message');
     if (welcome) welcome.remove();
 
+    // Capture attachments for this message
+    const attachments = [...pendingAttachments];
+    pendingAttachments = [];
+    renderAttachmentList();
+
+    // Build attachment file names for display
+    const attachmentNames = attachments.map((f) => f.name);
+
     // Add user message
     conversationHistory.push({ role: 'user', content: text });
-    appendMessage('user', text);
+    appendMessage('user', text, null, attachmentNames);
 
     userInput.value = '';
     userInput.style.height = 'auto';
@@ -158,7 +223,6 @@
     const typingEl = appendTypingIndicator();
 
     const provider = providerSelect.value;
-    const info = providerInfo[provider];
 
     try {
       // Build messages with optional system prompt
@@ -167,7 +231,27 @@
       if (sysPrompt) {
         messages.push({ role: 'system', content: sysPrompt });
       }
-      messages.push(...conversationHistory);
+
+      // If there are attachments, read them and include context
+      if (attachments.length > 0) {
+        const attachInfo = [];
+        for (const file of attachments) {
+          if (file.type.startsWith('text/') || file.name.match(/\.(txt|csv|json|xml|md|log|js|py|html|css)$/i)) {
+            const content = await file.text();
+            attachInfo.push(`[Attached file: ${file.name}]\n${content}`);
+          } else {
+            attachInfo.push(`[Attached file: ${file.name} (${file.type || 'unknown type'}, ${formatFileSize(file.size)})]`);
+          }
+        }
+        const lastMsg = conversationHistory[conversationHistory.length - 1];
+        const enrichedContent = attachInfo.join('\n\n') + '\n\n' + lastMsg.content;
+        messages.push(
+          ...conversationHistory.slice(0, -1),
+          { role: 'user', content: enrichedContent }
+        );
+      } else {
+        messages.push(...conversationHistory);
+      }
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -204,7 +288,13 @@
     }
   }
 
-  function appendMessage(role, content, meta) {
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function appendMessage(role, content, meta, attachmentNames) {
     const provider = meta?.provider || providerSelect.value;
     const info = providerInfo[provider];
 
@@ -217,7 +307,23 @@
 
     const bubble = document.createElement('div');
     bubble.className = 'message-bubble';
-    bubble.textContent = content;
+
+    // Show attachment chips if present
+    if (attachmentNames && attachmentNames.length > 0) {
+      const attachDiv = document.createElement('div');
+      attachDiv.className = 'message-attachments';
+      attachmentNames.forEach((name) => {
+        const chip = document.createElement('span');
+        chip.className = 'message-attachment-chip';
+        chip.textContent = name;
+        attachDiv.appendChild(chip);
+      });
+      bubble.appendChild(attachDiv);
+    }
+
+    const textNode = document.createElement('span');
+    textNode.textContent = content;
+    bubble.appendChild(textNode);
 
     wrapper.appendChild(avatar);
     wrapper.appendChild(bubble);

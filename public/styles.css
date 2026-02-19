@@ -8,22 +8,22 @@
 }
 
 :root {
-  --bg-primary: #0f1117;
-  --bg-secondary: #1a1b26;
-  --bg-tertiary: #24253a;
-  --bg-input: #2a2b3d;
-  --text-primary: #e1e2e8;
-  --text-secondary: #9ca0b0;
-  --text-muted: #6b7084;
-  --accent-blue: #7aa2f7;
-  --accent-green: #9ece6a;
-  --accent-purple: #bb9af7;
-  --accent-orange: #ff9e64;
-  --accent-red: #f7768e;
-  --border-color: #2f3146;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f6f8;
+  --bg-tertiary: #ebedf0;
+  --bg-input: #ffffff;
+  --text-primary: #1a1a1a;
+  --text-secondary: #555555;
+  --text-muted: #888888;
+  --accent-blue: #2563eb;
+  --accent-green: #16a34a;
+  --accent-purple: #7c3aed;
+  --accent-orange: #ea580c;
+  --accent-red: #dc2626;
+  --border-color: #d1d5db;
   --radius: 8px;
   --radius-lg: 12px;
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 html,
@@ -44,25 +44,31 @@ body {
 
 /* Header */
 header {
-  padding: 16px 24px;
-  background: var(--bg-secondary);
+  padding: 12px 24px;
+  background: var(--bg-primary);
   border-bottom: 1px solid var(--border-color);
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-logo {
+  height: 36px;
+  width: auto;
+  display: block;
 }
 
 header h1 {
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
+  white-space: nowrap;
 }
 
 .subtitle {
   color: var(--text-secondary);
   font-size: 0.85rem;
-  margin-top: 2px;
+  margin-left: auto;
 }
 
 /* Layout */
@@ -128,7 +134,7 @@ header h1 {
   appearance: none;
   width: 100%;
   height: 6px;
-  background: var(--bg-input);
+  background: var(--bg-tertiary);
   border-radius: 3px;
   outline: none;
 }
@@ -202,7 +208,7 @@ header h1 {
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #6991e6;
+  background: #1d4ed8;
 }
 
 .btn-secondary {
@@ -212,7 +218,7 @@ header h1 {
 }
 
 .btn-secondary:hover {
-  background: var(--bg-input);
+  background: var(--border-color);
 }
 
 /* Chat Area */
@@ -237,8 +243,8 @@ header h1 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  flex: 1;
+  justify-content: flex-start;
+  padding-top: 40px;
   text-align: center;
   gap: 16px;
   color: var(--text-secondary);
@@ -261,7 +267,7 @@ header h1 {
   align-items: center;
   gap: 8px;
   padding: 20px 28px;
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   cursor: pointer;
@@ -377,8 +383,8 @@ header h1 {
 }
 
 .message.error .message-bubble {
-  background: rgba(247, 118, 142, 0.15);
-  border-color: var(--accent-red);
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid var(--accent-red);
   color: var(--accent-red);
 }
 
@@ -425,31 +431,104 @@ header h1 {
 /* Input Area */
 .input-area {
   padding: 16px 24px;
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   border-top: 1px solid var(--border-color);
   display: flex;
   gap: 12px;
   align-items: flex-end;
 }
 
-.input-area textarea {
+.input-wrapper {
   flex: 1;
-  background: var(--bg-input);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
+  padding: 8px 12px;
+  transition: border-color 0.2s;
+}
+
+.input-wrapper:focus-within {
+  border-color: var(--accent-blue);
+}
+
+.input-wrapper textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
   color: var(--text-primary);
-  padding: 12px 16px;
+  padding: 4px 4px;
   font-size: 0.95rem;
   font-family: inherit;
   line-height: 1.5;
   resize: none;
   outline: none;
   max-height: 200px;
-  transition: border-color 0.2s;
 }
 
-.input-area textarea:focus {
-  border-color: var(--accent-blue);
+.attachment-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.attach-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.attach-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.attach-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.attachment-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.attachment-chip .remove-attachment {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.attachment-chip .remove-attachment:hover {
+  color: var(--accent-red);
 }
 
 .input-area .btn-primary {
@@ -457,9 +536,32 @@ header h1 {
   min-width: 80px;
 }
 
+/* Attachment preview in messages */
+.message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.message-attachment-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+}
+
+.message.assistant .message-attachment-chip {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
 /* Code blocks in messages */
 .message-bubble pre {
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
   padding: 12px;
@@ -474,7 +576,7 @@ header h1 {
 }
 
 .message-bubble p code {
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -501,6 +603,14 @@ header h1 {
 
   .provider-card {
     padding: 16px 20px;
+  }
+
+  header {
+    flex-wrap: wrap;
+  }
+
+  .header-logo {
+    height: 28px;
   }
 }
 
