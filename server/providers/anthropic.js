@@ -1,10 +1,10 @@
 const https = require('https');
 
 const models = [
-  { id: 'claude-opus-4-0-20250514', name: 'Claude Opus 4' },
+  { id: 'claude-opus-4-6', name: 'Claude Opus 4' },
   { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4' },
-  { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet' },
-  { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku' },
+  { id: 'claude-sonnet-4-6', name: 'Claude 4.6 Sonnet' },
+  { id: 'claude-haiku-4-5-20251001', name: 'Claude 4.5 Haiku' },
 ];
 
 async function chat({ model, messages, temperature, maxTokens }) {
@@ -45,16 +45,20 @@ async function chat({ model, messages, temperature, maxTokens }) {
         },
       },
       (res) => {
+
         let data = '';
         res.on('data', (chunk) => (data += chunk));
         res.on('end', () => {
           try {
             const parsed = JSON.parse(data);
+
+            console.log(parsed)
             if (res.statusCode !== 200) {
               const err = new Error(parsed.error?.message || 'Anthropic API request failed');
               err.status = res.statusCode;
               return reject(err);
             }
+            console.log(parsed)
             resolve({
               provider: 'anthropic',
               model: parsed.model,
