@@ -12,9 +12,24 @@
       <img src="/logo-mff.jpg" alt="Marc Fisher Footwear" class="header-logo" />
       <h1></h1>
       <p class="subtitle">Chat with ChatGPT, Claude &amp; Gemini in one place</p>
+      <div class="user-menu" id="user-menu">
+        <span class="user-name" id="user-name"></span>
+        <a href="/auth/signout" class="sign-out-link">Sign Out</a>
+      </div>
     </header>
 
     <div class="layout">
+      <!-- Chat History Panel -->
+      <nav class="history-panel">
+        <div class="history-header">
+          <h3>Chat History</h3>
+          <button id="new-chat-btn" class="btn btn-secondary btn-sm">+ New</button>
+        </div>
+        <div class="history-list" id="history-list">
+          <div class="history-empty">No previous chats</div>
+        </div>
+      </nav>
+
       <!-- Sidebar -->
       <aside class="sidebar">
         <div class="sidebar-section">
@@ -64,8 +79,6 @@
             placeholder="Optional system instructions..."
           ></textarea>
         </div>
-
-        <button id="new-chat-btn" class="btn btn-secondary">New Chat</button>
 
         <div class="sidebar-section status-section" id="status-section">
           <h3>API Status</h3>

@@ -14,12 +14,16 @@
   const attachBtn = document.getElementById('attach-btn');
   const fileInput = document.getElementById('file-input');
   const attachmentList = document.getElementById('attachment-list');
+  const historyList = document.getElementById('history-list');
+  const userNameEl = document.getElementById('user-name');
 
   // State
   let conversationHistory = [];
   let isGenerating = false;
   let modelData = {};
   let pendingAttachments = [];
+  let currentChatId = null;
+  let chatList = [];
 
   // Provider display info
   const providerInfo = {
@@ -30,14 +34,27 @@
 
   // Initialize
   async function init() {
-    await Promise.all([fetchModels(), checkHealth()]);
+    await Promise.all([fetchModels(), checkHealth(), loadUser(), loadChatHistory()]);
     setupEventListeners();
     updateModelList();
+  }
+
+  async function loadUser() {
+    try {
+      const res = await fetch('/api/me');
+      if (res.ok) {
+        const user = await res.json();
+        userNameEl.textContent = user.name || user.email || '';
+      }
+    } catch {
+      // Ignore — will redirect to login if session expired
+    }
   }
 
   async function fetchModels() {
     try {
       const res = await fetch('/api/chat/models');
+      if (!res.ok) return;
       modelData = await res.json();
     } catch {
       modelData = { openai: [], anthropic: [], google: [] };
@@ -47,6 +64,7 @@
   async function checkHealth() {
     try {
       const res = await fetch('/api/health');
+      if (!res.ok) return;
       const data = await res.json();
       renderApiStatus(data.providers);
     } catch {
@@ -84,7 +102,6 @@
 
     userInput.addEventListener('input', () => {
       sendBtn.disabled = !userInput.value.trim() || isGenerating;
-      // Auto-resize
       userInput.style.height = 'auto';
       userInput.style.height = Math.min(userInput.scrollHeight, 200) + 'px';
     });
@@ -97,28 +114,166 @@
     });
 
     sendBtn.addEventListener('click', sendMessage);
-    newChatBtn.addEventListener('click', clearChat);
+    newChatBtn.addEventListener('click', startNewChat);
 
-    // Attachment handlers
     attachBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', handleFileSelect);
 
-    // Provider card click handlers
     document.querySelectorAll('.provider-card').forEach((card) => {
       card.addEventListener('click', () => {
-        const provider = card.dataset.provider;
-        providerSelect.value = provider;
+        providerSelect.value = card.dataset.provider;
         updateModelList();
         userInput.focus();
       });
     });
   }
 
-  // Attachment handling
+  // ---- Chat History ----
+
+  async function loadChatHistory() {
+    try {
+      const res = await fetch('/api/history');
+      if (!res.ok) return;
+      chatList = await res.json();
+      renderChatHistory();
+    } catch {
+      // Silently fail
+    }
+  }
+
+  function renderChatHistory() {
+    if (chatList.length === 0) {
+      historyList.innerHTML = '<div class="history-empty">No previous chats</div>';
+      return;
+    }
+    historyList.innerHTML = chatList
+      .map(
+        (chat) => `
+      <div class="history-item ${chat.id === currentChatId ? 'active' : ''}" data-id="${chat.id}">
+        <div class="history-item-content">
+          <div class="history-item-title">${escapeHtml(chat.title)}</div>
+          <div class="history-item-date">${formatDate(chat.updated_at)}</div>
+        </div>
+        <button class="delete-chat" data-id="${chat.id}" title="Delete">&times;</button>
+      </div>`
+      )
+      .join('');
+
+    historyList.querySelectorAll('.history-item').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        if (e.target.classList.contains('delete-chat')) return;
+        openChat(el.dataset.id);
+      });
+    });
+
+    historyList.querySelectorAll('.delete-chat').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteChat(btn.dataset.id);
+      });
+    });
+  }
+
+  async function openChat(chatId) {
+    try {
+      const res = await fetch(`/api/history/${chatId}`);
+      if (!res.ok) return;
+      const chat = await res.json();
+
+      currentChatId = chatId;
+      conversationHistory = chat.messages
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      // Set provider/model if saved
+      if (chat.provider && providerSelect.querySelector(`option[value="${chat.provider}"]`)) {
+        providerSelect.value = chat.provider;
+        updateModelList();
+      }
+      if (chat.model && modelSelect.querySelector(`option[value="${chat.model}"]`)) {
+        modelSelect.value = chat.model;
+      }
+
+      // Clear and render messages
+      messagesContainer.innerHTML = '';
+      chat.messages.forEach((msg) => {
+        const attachments = msg.attachments || null;
+        appendMessage(msg.role, msg.content, null, attachments);
+      });
+
+      renderChatHistory();
+    } catch {
+      // Silently fail
+    }
+  }
+
+  async function deleteChat(chatId) {
+    try {
+      await fetch(`/api/history/${chatId}`, { method: 'DELETE' });
+      if (chatId === currentChatId) {
+        startNewChat();
+      }
+      chatList = chatList.filter((c) => c.id !== chatId);
+      renderChatHistory();
+    } catch {
+      // Silently fail
+    }
+  }
+
+  async function ensureChat() {
+    if (currentChatId) return currentChatId;
+    try {
+      const provider = providerSelect.value;
+      const model = modelSelect.value;
+      const res = await fetch('/api/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'New Chat', provider, model }),
+      });
+      const data = await res.json();
+      currentChatId = data.id;
+      await loadChatHistory();
+      return currentChatId;
+    } catch {
+      return null;
+    }
+  }
+
+  async function saveMessage(role, content, attachmentNames) {
+    if (!currentChatId) return;
+    try {
+      await fetch(`/api/history/${currentChatId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role, content, attachments: attachmentNames || null }),
+      });
+    } catch {
+      // Silently fail
+    }
+  }
+
+  async function updateChatTitle(title) {
+    if (!currentChatId) return;
+    try {
+      await fetch(`/api/history/${currentChatId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      });
+      const chat = chatList.find((c) => c.id === currentChatId);
+      if (chat) chat.title = title;
+      renderChatHistory();
+    } catch {
+      // Silently fail
+    }
+  }
+
+  // ---- Attachments ----
+
   function handleFileSelect(e) {
     const files = Array.from(e.target.files);
     files.forEach((file) => {
-      if (pendingAttachments.length >= 5) return; // Max 5 attachments
+      if (pendingAttachments.length >= 5) return;
       pendingAttachments.push(file);
     });
     fileInput.value = '';
@@ -153,15 +308,10 @@
     return truncLen > 0 ? base.slice(0, truncLen) + '...' + ext : name.slice(0, maxLen);
   }
 
-  async function readFileAsBase64(file) {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.readAsDataURL(file);
-    });
-  }
+  // ---- Chat ----
 
-  function clearChat() {
+  function startNewChat() {
+    currentChatId = null;
     conversationHistory = [];
     pendingAttachments = [];
     renderAttachmentList();
@@ -184,7 +334,6 @@
           </div>
         </div>
       </div>`;
-    // Re-attach provider card click handlers
     document.querySelectorAll('.provider-card').forEach((card) => {
       card.addEventListener('click', () => {
         providerSelect.value = card.dataset.provider;
@@ -192,55 +341,64 @@
         userInput.focus();
       });
     });
+    renderChatHistory();
   }
 
   async function sendMessage() {
     const text = userInput.value.trim();
     if (!text || isGenerating) return;
 
-    // Remove welcome message on first send
     const welcome = messagesContainer.querySelector('.welcome-message');
     if (welcome) welcome.remove();
 
-    // Capture attachments for this message
+    // Ensure we have a chat record
+    await ensureChat();
+
     const attachments = [...pendingAttachments];
     pendingAttachments = [];
     renderAttachmentList();
 
-    // Build attachment file names for display
     const attachmentNames = attachments.map((f) => f.name);
 
     // Add user message
     conversationHistory.push({ role: 'user', content: text });
     appendMessage('user', text, null, attachmentNames);
+    saveMessage('user', text, attachmentNames.length > 0 ? attachmentNames : null);
+
+    // Auto-title: use first message as chat title
+    if (conversationHistory.length === 1) {
+      const title = text.length > 50 ? text.slice(0, 50) + '...' : text;
+      updateChatTitle(title);
+    }
 
     userInput.value = '';
     userInput.style.height = 'auto';
     sendBtn.disabled = true;
     isGenerating = true;
 
-    // Show typing indicator
     const typingEl = appendTypingIndicator();
-
     const provider = providerSelect.value;
 
     try {
-      // Build messages with optional system prompt
       const messages = [];
       const sysPrompt = systemPrompt.value.trim();
       if (sysPrompt) {
         messages.push({ role: 'system', content: sysPrompt });
       }
 
-      // If there are attachments, read them and include context
       if (attachments.length > 0) {
         const attachInfo = [];
         for (const file of attachments) {
-          if (file.type.startsWith('text/') || file.name.match(/\.(txt|csv|json|xml|md|log|js|py|html|css)$/i)) {
+          if (
+            file.type.startsWith('text/') ||
+            file.name.match(/\.(txt|csv|json|xml|md|log|js|py|html|css)$/i)
+          ) {
             const content = await file.text();
             attachInfo.push(`[Attached file: ${file.name}]\n${content}`);
           } else {
-            attachInfo.push(`[Attached file: ${file.name} (${file.type || 'unknown type'}, ${formatFileSize(file.size)})]`);
+            attachInfo.push(
+              `[Attached file: ${file.name} (${file.type || 'unknown type'}, ${formatFileSize(file.size)})]`
+            );
           }
         }
         const lastMsg = conversationHistory[conversationHistory.length - 1];
@@ -266,7 +424,6 @@
       });
 
       const data = await res.json();
-
       typingEl.remove();
 
       if (!res.ok) {
@@ -278,6 +435,14 @@
           model: data.model,
           usage: data.usage,
         });
+        saveMessage('assistant', data.content);
+
+        // Update provider/model on the chat record
+        fetch(`/api/history/${currentChatId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider, model: modelSelect.value }),
+        }).catch(() => {});
       }
     } catch (err) {
       typingEl.remove();
@@ -294,6 +459,24 @@
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   }
 
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + 'Z');
+    const now = new Date();
+    const diff = now - d;
+    if (diff < 60000) return 'Just now';
+    if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+    if (diff < 604800000) return Math.floor(diff / 86400000) + 'd ago';
+    return d.toLocaleDateString();
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
   function appendMessage(role, content, meta, attachmentNames) {
     const provider = meta?.provider || providerSelect.value;
     const info = providerInfo[provider];
@@ -308,7 +491,6 @@
     const bubble = document.createElement('div');
     bubble.className = 'message-bubble';
 
-    // Show attachment chips if present
     if (attachmentNames && attachmentNames.length > 0) {
       const attachDiv = document.createElement('div');
       attachDiv.className = 'message-attachments';
