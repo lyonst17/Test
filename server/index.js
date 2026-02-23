@@ -56,21 +56,20 @@ app.get('/auth/signout', auth.logout);
 // Static assets (CSS, JS, images) must be accessible for login page
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// --- Auth check: everything below requires login ---
-app.use(auth.requireAuth);
+// Expose lightweight public endpoints before auth middleware so the
+// frontend can fetch models/health while the user is not signed in.
+const openaiProvider = require('./providers/openai');
+const anthropicProvider = require('./providers/anthropic');
+const googleProvider = require('./providers/google');
 
-// Current user info
-app.get('/api/me', (req, res) => {
-  res.json(req.session.user);
+app.get('/api/chat/models', (_req, res) => {
+  res.json({
+    openai: openaiProvider.models,
+    anthropic: anthropicProvider.models,
+    google: googleProvider.models,
+  });
 });
 
-// Chat API
-app.use('/api/chat', chatRoutes);
-
-// Chat history API
-app.use('/api/history', historyRoutes);
-
-// Health check
 app.get('/api/health', (_req, res) => {
   const providers = {
     openai: !!process.env.OPENAI_API_KEY,
@@ -79,6 +78,20 @@ app.get('/api/health', (_req, res) => {
   };
   res.json({ status: 'ok', providers });
 });
+
+// --- Auth check: everything below requires login ---
+app.use(auth.requireAuth);
+
+// Current user info
+app.get('/api/me', (req, res) => {
+  res.json(req.session.user);
+});
+
+// Chat API (protected)
+app.use('/api/chat', chatRoutes);
+
+// Chat history API (protected)
+app.use('/api/history', historyRoutes);
 
 // Return 404 JSON for unmatched API routes
 app.use((req, res, next) => {
